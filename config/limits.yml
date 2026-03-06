@@ -1,0 +1,5 @@
+credit_limits:
+  acc_amex_cc: 30000
+  acc_citi_cc: 10000
+  acc_capone_cc: 20000
+  acc_discover_cc: 15000

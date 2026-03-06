@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Analysis - Transaction-Level Debt Paydown Planner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            color: #333;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            color: #333;
+            padding: 12px 24px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .file-input-wrapper:hover {
+            background: #e9ecef;
+        }
+        
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .card.income .value { color: #10b981; }
+        .card.expense .value { color: #ef4444; }
+        .card.net .value { color: #333; }
+        
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .transaction-row {
+            cursor: pointer;
+        }
+        
+        .transaction-row.selected {
+            background: #e0e7ff;
+        }
+        
+        .amount {
+            font-weight: bold;
+        }
+        
+        .amount.negative {
+            color: #ef4444;
+        }
+        
+        .amount.positive {
+            color: #10b981;
+        }
+        
+        .cut-amount {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .impact-preview {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        
+        .impact-preview h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .impact-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+        }
+        
+        .btn {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #dee2e6;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+        
+        .btn:hover {
+            background: #e9ecef;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .debt-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .debt-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 Financial Analysis</h1>
+            <p>Transaction-Level Debt Paydown Planner</p>
+        </header>
+        
+        <div class="upload-section">
+            <h2>Load Financial Data</h2>
+            <p style="margin-bottom: 15px;">Upload the exported JSON file from financeApi/data/outputs/financial_data_for_analysis.json</p>
+            <div class="file-input-wrapper">
+                <span>📁 Choose File</span>
+                <input type="file" id="fileInput" accept=".json">
+            </div>
+            <p id="fileStatus" style="margin-top: 15px; color: #666;"></p>
+        </div>
+        
+        <div id="analysisContent" class="hidden">
+            <div class="summary-cards">
+                <div class="card income">
+                    <h3>YTD Income</h3>
+                    <div class="value" id="ytdIncome">$0</div>
+                </div>
+                <div class="card expense">
+                    <h3>YTD Expenses</h3>
+                    <div class="value" id="ytdExpenses">$0</div>
+                </div>
+                <div class="card net">
+                    <h3>Net Flow (YTD)</h3>
+                    <div class="value" id="netFlow">$0</div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Debt Overview</h2>
+                <div id="debtCards"></div>
+            </div>
+            
+            <div class="section">
+                <h2 id="transactionsHeader">Transactions</h2>
+                <p style="margin-bottom: 15px;">Click on transactions to mark them for reduction. Enter how much you can cut from each.</p>
+                <table id="transactionsTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Account</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Cut Amount</th>
+                            <th>Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="section">
+                <div class="impact-preview">
+                    <h3>💡 Debt Paydown Impact Preview</h3>
+                    <div id="impactPreview">
+                        <p>Select transactions and enter cut amounts to see the impact on your debt paydown.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="analysis.js"></script>
+</body>
+</html>
+

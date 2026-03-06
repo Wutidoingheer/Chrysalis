@@ -1,0 +1,36 @@
+# Debt Configuration
+# APR and payment amounts for credit cards
+# Balances are pulled live from Monarch Money accounts
+# Match account names (case-insensitive partial match)
+#
+# ACTIVE CARDS (carrying balances, tracked for paydown):
+#   - Delta SkyMiles Amex: primary everyday spending card (points), target for extra payments
+#   - Costco Citi: Costco purchases only
+#   - Amazon Store Card: nearly paid off
+#
+# NOT TRACKED (autopay full balance each month, no carried balance):
+#   - Capital One QuicksilverOne (McDonald's only, autopay full)
+#   - Verizon Visa (being paid off, switching to T-Mobile)
+
+debts:
+  # Delta SkyMiles Platinum (American Express) — primary spending card
+  # "Delta" matches "Delta SkyMiles® Platinum Card" in account display name
+  # Strategy: minimum payment monthly; all extra/windfall payments go here first
+  Delta:
+    apr: 29.99
+    payment: 650.0  # update to actual committed monthly payment
+    limit: 31900
+
+  # Costco Anywhere Visa (Citi) — Costco purchases only
+  # "Citi" matches "Costco Anywhere Visa Card by Citi" in account display name
+  Citi:
+    apr: 29.99
+    payment: 400.0  # update to actual committed monthly payment
+    limit: 12000
+
+  # Amazon Store Card — nearly paid off, then close/ignore
+  # APR calculated from statement: $16.03 interest on $560.22 balance = 34.3%
+  Amazon:
+    apr: 34.3
+    payment: 112.0  # matches actual Synchrony payment seen in Feb transactions
+    limit: 10000

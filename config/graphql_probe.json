@@ -1,0 +1,5 @@
+{
+  "operationName": "Web_GetTransactionsSummaryCard",
+  "variables": { "filters": { "transactionVisibility": "non_hidden_transactions_only" } },
+  "query": "query Web_GetTransactionsSummaryCard($filters: TransactionFilterInput!) {\n  allTransactions(filters: $filters) {\n    totalCount\n    __typename\n  }\n}"
+}

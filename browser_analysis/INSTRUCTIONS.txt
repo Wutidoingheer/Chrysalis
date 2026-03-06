@@ -1,0 +1,33 @@
+BROWSER ANALYSIS - FILE LOCATIONS
+==================================
+
+TO IMPORT:
+----------
+1. Open: browser_analysis/index.html
+   (Full path: financeApi/browser_analysis/index.html)
+
+2. Click "Choose File" button
+
+3. Select this file:
+   financeApi/data/outputs/financial_data_for_analysis.json
+
+That's it! The analysis will load automatically.
+
+WHAT IT ANALYZES:
+-----------------
+- By default: previous month's credit card transactions
+- Year-in-review: run
+    python scripts/export_for_browser_analysis.py --year-in-review 2025
+  then load the same JSON for full 2025 credit card transactions
+- All transactions are shown with ability to enter cut amounts
+- Real-time calculation of debt paydown impact
+- Shows interest saved and months saved for each debt
+
+NO VISUALIZATION MODE:
+----------------------
+- Simple, clean interface
+- Focus on data and calculations
+- No fancy graphics or animations
+
+
+
