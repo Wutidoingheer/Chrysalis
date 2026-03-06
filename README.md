@@ -93,7 +93,7 @@ Chrysalis/
 
 ## Dependencies
 
-This project uses a fork of the `monarchmoney` Python library with additional features and performance improvements:
+This project uses a fork of the [`monarchmoney`](https://github.com/keithah/monarchmoney) Python library (originally by [@keithah](https://github.com/keithah)) with additional features and performance improvements:
 [github.com/Wutidoingheer/monarchmoney](https://github.com/Wutidoingheer/monarchmoney)
 
 ## License
