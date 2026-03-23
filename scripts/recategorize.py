@@ -1,17 +1,17 @@
 """
 recategorize.py
 
-Applies merchant-based recategorization rules to this month's transactions.
+Applies merchant-based recategorization rules to transactions.
 Previews changes before applying them.
 
 Usage:
-    python scripts/recategorize.py           # preview only
-    python scripts/recategorize.py --apply   # apply changes
+    python scripts/recategorize.py                          # preview this month
+    python scripts/recategorize.py --apply                  # apply this month
+    python scripts/recategorize.py --start 2025-12-01       # preview from date
+    python scripts/recategorize.py --start 2025-12-01 --end 2026-02-28 --apply
 
 Add your rules to the RULES list below. Each rule matches on merchant name
 (case-insensitive substring) and assigns a target category ID.
-
-Run `get_transaction_categories()` or check config/categories.yml for IDs.
 """
 
 import asyncio
@@ -31,9 +31,10 @@ SESSION_FILE = Path(".mm/mm_session.pickle")
 # Matching is case-insensitive. First matching rule wins.
 
 RULES: list[tuple[str, str, str]] = [
-    ("costco",     "225515046838784483", "Groceries"),
-    ("walmart",    "225515046838784483", "Groceries"),
-    ("icpayment",  "225515046838784469", "Auto Payment"),
+    ("costco",      "225515046838784483", "Groceries"),
+    ("walmart",     "225515046838784483", "Groceries"),
+    ("icpayment",   "225515046838784469", "Auto Payment"),
+    ("firstmark",   "225515046838784497", "Student Loans"),
 ]
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -51,9 +52,18 @@ async def get_client() -> MonarchMoney:
     return mm
 
 
+# ── CLI arg helpers ───────────────────────────────────────────────────────────
+
+def get_arg(flag: str) -> str | None:
+    try:
+        return sys.argv[sys.argv.index(flag) + 1]
+    except (ValueError, IndexError):
+        return None
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
-async def main(apply: bool = False):
+async def main(apply: bool = False, start: str | None = None, end: str | None = None):
     try:
         mm = await get_client()
     except (LoginFailedException, SessionExpiredError):
@@ -61,15 +71,14 @@ async def main(apply: bool = False):
         sys.exit(1)
 
     now = datetime.now()
-    start = now.strftime("%Y-%m-01")
-    end = now.strftime("%Y-%m-%d")
+    start = start or now.strftime("%Y-%m-01")
+    end   = end   or now.strftime("%Y-%m-%d")
 
-    print(f"Scanning transactions for {now.strftime('%B %Y')}...\n")
+    print(f"Scanning transactions {start} to {end}...\n")
 
-    txns_data = await mm.get_transactions(start_date=start, end_date=end, limit=500)
+    txns_data = await mm.get_transactions(start_date=start, end_date=end, limit=2000)
     txns = txns_data.get("allTransactions", {}).get("results", [])
 
-    # Match transactions against rules
     changes: list[dict] = []
     for t in txns:
         merchant = (t.get("merchant") or {}).get("name") or t.get("description", "")
@@ -78,7 +87,6 @@ async def main(apply: bool = False):
 
         for pattern, target_id, target_label in RULES:
             if pattern.lower() in merchant.lower():
-                # Skip if already in the target category
                 if current_cat_id == target_id:
                     break
                 changes.append({
@@ -90,15 +98,14 @@ async def main(apply: bool = False):
                     "to_cat": target_label,
                     "to_id": target_id,
                 })
-                break  # first matching rule wins
+                break
 
     if not changes:
         print("No transactions matched the recategorization rules.")
         return
 
-    # Preview
     print(f"  {'DATE':<12} {'MERCHANT':<32} {'AMOUNT':>9}  {'FROM':<22}  {'TO'}")
-    print("  " + "-" * 90)
+    print("  " + "-" * 92)
     for c in sorted(changes, key=lambda x: x["date"]):
         print(
             f"  {c['date']:<12}"
@@ -114,7 +121,6 @@ async def main(apply: bool = False):
         print("\n  Run with --apply to commit these changes.")
         return
 
-    # Group by target category for bulk update
     by_category: dict[str, list[str]] = {}
     for c in changes:
         by_category.setdefault(c["to_id"], []).append(c["id"])
@@ -133,5 +139,8 @@ async def main(apply: bool = False):
 
 
 if __name__ == "__main__":
-    apply = "--apply" in sys.argv
-    asyncio.run(main(apply=apply))
+    asyncio.run(main(
+        apply="--apply" in sys.argv,
+        start=get_arg("--start"),
+        end=get_arg("--end"),
+    ))
