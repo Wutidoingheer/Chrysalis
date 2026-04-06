@@ -4,6 +4,13 @@ import pandas as pd
 from jinja2 import Template
 import yaml
 from src.analytics.utilization import utilization_by_account
+from src.analytics.home_purchase_readiness import (
+    load_config as load_hp_config,
+    spending_vs_targets,
+    monthly_savings_progress,
+    milestone_status,
+    dti_readiness,
+)
 from src.ingest.fetch_csv import load_transactions as load_csv
 
 # ---------- Config you can tweak ----------
@@ -206,6 +213,107 @@ HTML = Template("""
   </table>
   <p class="muted">Flags: try to keep per-card & overall under ~30%, ideally ~10–20% overall.</p>
 </div>
+
+{% if hp_enabled %}
+<div class="section">
+  <h2>🏡 Home Purchase Readiness</h2>
+  <p class="muted">Target: ~$650k home by {{ hp_target_move_date }} &nbsp;|&nbsp; Est. proceeds: ${{ "{:,.0f}".format(hp_net_proceeds) }} &nbsp;|&nbsp; New PITI: ${{ "{:,.0f}".format(hp_piti_low) }}–${{ "{:,.0f}".format(hp_piti_high) }}/mo</p>
+
+  <h3>1. Spending Category Targets</h3>
+  <p class="muted">Monthly caps for the three cut areas. Goal: keep actual at or below target.</p>
+  <table>
+    <tr><th>Category</th><th>Monthly Target</th>
+    {% for m in hp_spend_months %}<th>{{ m }}</th>{% endfor %}
+    <th>Avg Actual</th><th>Avg vs Target</th></tr>
+    {% for row in hp_spending %}
+    <tr>
+      <td><strong>{{ row.label }}</strong></td>
+      <td>${{ "{:,.0f}".format(row.target) }}</td>
+      {% for m in row.months %}
+      <td style="color: {{ 'red' if m.over_by > 0 else 'green' }}; font-weight: bold;">
+        ${{ "{:,.0f}".format(m.actual) }}
+      </td>
+      {% endfor %}
+      <td style="font-weight: bold;">${{ "{:,.0f}".format(row.avg_actual) }}</td>
+      <td style="color: {{ 'red' if row.avg_over_by > 0 else 'green' }}; font-weight: bold;">
+        {{ ("+" if row.avg_over_by > 0 else "") + "${:,.0f}".format(row.avg_over_by) }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h3>2. Monthly Savings vs. ${{ "{:,.0f}".format(hp_savings_goal) }}/mo Goal</h3>
+  <p class="muted">Savings = combined target ceiling (${{ "{:,.0f}".format(hp_combined_target) }}/mo) minus actual spend in tracked categories.</p>
+  <table>
+    <tr><th>Month</th><th>Target Ceiling</th><th>Actual Spend</th><th>Saved</th><th>vs. ${{ "{:,.0f}".format(hp_savings_goal) }} Goal</th><th>Cumulative Saved</th></tr>
+    {% for r in hp_savings_months %}
+    <tr>
+      <td>{{ r.month }}</td>
+      <td>${{ "{:,.0f}".format(r.total_target) }}</td>
+      <td>${{ "{:,.0f}".format(r.total_actual) }}</td>
+      <td style="color: {{ 'green' if r.saved >= 0 else 'red' }}; font-weight: bold;">${{ "{:,.0f}".format(r.saved) }}</td>
+      <td style="color: {{ 'green' if r.vs_goal >= 0 else 'red' }}; font-weight: bold;">
+        {{ ("+" if r.vs_goal >= 0 else "") + "${:,.0f}".format(r.vs_goal) }}
+      </td>
+      <td>${{ "{:,.0f}".format(r.cumulative) }}</td>
+    </tr>
+    {% endfor %}
+    <tr style="background:#f5f5f5; font-weight: bold;">
+      <td colspan="5">Cumulative Saved ({{ hp_savings_months|length }} months)</td>
+      <td style="color: {{ 'green' if hp_cumulative_saved >= hp_cumulative_goal else 'red' }};">
+        ${{ "{:,.0f}".format(hp_cumulative_saved) }} / ${{ "{:,.0f}".format(hp_cumulative_goal) }} goal
+        ({{ "{:.0f}%".format(hp_cumulative_saved / hp_cumulative_goal * 100 if hp_cumulative_goal else 0) }})
+      </td>
+    </tr>
+  </table>
+
+  <h3>3. Milestone Tracker</h3>
+  <table>
+    <tr><th>Milestone</th><th>Target Date</th><th>Days Away</th><th>Progress</th><th>Status</th></tr>
+    {% for ms in hp_milestones %}
+    <tr>
+      <td>{{ ms.label }}</td>
+      <td>{{ ms.target_date }}</td>
+      <td>{{ ms.days_away if ms.days_away >= 0 else "Passed" }}</td>
+      <td>
+        <div style="background:#eee; border-radius:4px; height:12px; width:120px; display:inline-block; vertical-align:middle;">
+          <div style="background: {{ '#4caf50' if ms.status == 'completed' else '#2196f3' if ms.status == 'imminent' else '#ff9800' if ms.status == 'upcoming' else '#90caf9' }}; width:{{ ms.pct_elapsed }}%; height:100%; border-radius:4px;"></div>
+        </div>
+        <span style="font-size:0.85em; margin-left:6px;">{{ ms.pct_elapsed }}%</span>
+      </td>
+      <td style="font-weight: bold; color: {{ '#4caf50' if ms.status == 'completed' else '#e65100' if ms.status == 'imminent' else '#1976d2' if ms.status == 'upcoming' else '#666' }};">
+        {{ ms.status | upper }}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h3>4. DTI Readiness</h3>
+  <p class="muted">Gross monthly income: ${{ "{:,.0f}".format(hp_dti.gross_monthly_income) }} &nbsp;|&nbsp; Thresholds: &lt;36% ideal, &lt;43% conventional max</p>
+  <table>
+    <tr><th>Scenario</th><th>Monthly Obligations</th><th>DTI</th><th>Status</th></tr>
+    <tr>
+      <td><strong>Current</strong> (CC payments + existing mortgage)</td>
+      <td>${{ "{:,.0f}".format(hp_dti.current_total_payments) }}/mo</td>
+      <td style="font-weight: bold; color: {{ 'green' if hp_dti.current_dti < 36 else 'orange' if hp_dti.current_dti < 43 else 'red' }};">{{ hp_dti.current_dti }}%</td>
+      <td>{{ "OK" if hp_dti.current_dti < 43 else "HIGH" }}</td>
+    </tr>
+    <tr>
+      <td><strong>Projected Low</strong> (CC payments + new PITI low)</td>
+      <td>${{ "{:,.0f}".format(hp_dti.projected_total_low) }}/mo</td>
+      <td style="font-weight: bold; color: {{ 'green' if hp_dti.projected_dti_low < 36 else 'orange' if hp_dti.projected_dti_low < 43 else 'red' }};">{{ hp_dti.projected_dti_low }}%</td>
+      <td>{{ "OK" if hp_dti.projected_dti_low < 43 else "HIGH" }}</td>
+    </tr>
+    <tr>
+      <td><strong>Projected High</strong> (CC payments + new PITI high)</td>
+      <td>${{ "{:,.0f}".format(hp_dti.projected_total_high) }}/mo</td>
+      <td style="font-weight: bold; color: {{ 'green' if hp_dti.projected_dti_high < 36 else 'orange' if hp_dti.projected_dti_high < 43 else 'red' }};">{{ hp_dti.projected_dti_high }}%</td>
+      <td>{{ "OK" if hp_dti.projected_dti_high < 43 else "HIGH" }}</td>
+    </tr>
+  </table>
+  <p class="muted">Note: paying down CC balances before closing will improve projected DTI. Update <code>config/home_purchase.yml</code> with your actual gross income.</p>
+</div>
+{% endif %}
 """)
 
 def load_any() -> pd.DataFrame:
@@ -442,6 +550,7 @@ if __name__ == "__main__":
 
     # Load live debt balances from accounts.json
     debts = []
+    accounts = []
     json_acc = Path("./data/raw/accounts.json")
     if json_acc.exists():
         with open(json_acc, "r", encoding="utf-8") as f:
@@ -539,6 +648,21 @@ if __name__ == "__main__":
     util_df, overall_util = utilization_by_account(balances_id, limits)
     util_rows = util_df.to_dict(orient="records")
 
+    # ── Home Purchase Readiness ────────────────────────────────────────────────
+    hp_cfg = load_hp_config()
+    hp_enabled = bool(hp_cfg)
+
+    hp_spending_data   = spending_vs_targets(df, hp_cfg, months=3) if hp_enabled else []
+    hp_savings_data    = monthly_savings_progress(df, hp_cfg, months=6) if hp_enabled else {}
+    hp_milestones_data = milestone_status(hp_cfg) if hp_enabled else []
+
+    # Load accounts list for DTI (already loaded above as `accounts`)
+    raw_accounts = accounts if accounts else []
+    hp_dti_data = dti_readiness(raw_accounts, hp_cfg) if hp_enabled else {}
+
+    hp_spend_months = hp_spending_data[0]["months"] if hp_spending_data else []
+    hp_spend_month_labels = [m["month"] for m in hp_spend_months]
+
     html = HTML.render(
         now=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
         cashflow=cf,
@@ -559,7 +683,22 @@ if __name__ == "__main__":
         recent=recent,
         recent_n=SHOW_RECENT_N,
         util_rows=util_rows,
-        overall_util=overall_util
+        overall_util=overall_util,
+        # Home Purchase Readiness
+        hp_enabled=hp_enabled,
+        hp_target_move_date=hp_cfg.get("target_move_date", ""),
+        hp_net_proceeds=hp_cfg.get("estimated_net_proceeds", 0),
+        hp_piti_low=hp_cfg.get("new_payment_piti_low", 0),
+        hp_piti_high=hp_cfg.get("new_payment_piti_high", 0),
+        hp_savings_goal=hp_savings_data.get("goal", 500),
+        hp_combined_target=hp_savings_data.get("combined_target", 0),
+        hp_spending=hp_spending_data,
+        hp_spend_months=hp_spend_month_labels,
+        hp_savings_months=hp_savings_data.get("months", []),
+        hp_cumulative_saved=hp_savings_data.get("cumulative_saved", 0),
+        hp_cumulative_goal=hp_savings_data.get("cumulative_goal", 0),
+        hp_milestones=hp_milestones_data,
+        hp_dti=type("DTI", (), hp_dti_data)() if hp_dti_data else None,
     )
     out = OUT / "report.html"
     out.write_text(html, encoding="utf-8")

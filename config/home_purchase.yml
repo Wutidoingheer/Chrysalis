@@ -1,0 +1,84 @@
+# Home Purchase Readiness — Planning & Accountability Configuration
+# Goal: Sell current home and buy ~$650k home by late 2027
+
+home_purchase:
+
+  # ── Current Home ─────────────────────────────────────────────────────────────
+  current_mortgage_payment: 1850.0     # Current P&I monthly payment
+  current_mortgage_rate: 2.75          # Current interest rate (%)
+
+  # ── New Home ─────────────────────────────────────────────────────────────────
+  target_home_price: 650000
+  estimated_net_proceeds: 120000       # Estimated proceeds from current home sale
+  new_payment_pi_low: 3400             # New P&I estimate — low end
+  new_payment_pi_high: 3500            # New P&I estimate — high end
+  new_payment_piti_low: 4200           # New PITI estimate — low end (w/ tax+ins+PMI)
+  new_payment_piti_high: 4600          # New PITI estimate — high end
+
+  # ── Timeline ─────────────────────────────────────────────────────────────────
+  target_move_date: "2027-12-01"       # Target close / move date
+  vest_event_date: "2026-12-01"        # December 2026 vest event
+
+  # ── Savings Discipline ───────────────────────────────────────────────────────
+  monthly_savings_goal: 500            # $500/mo from cutting subscriptions, Amazon, Walmart
+  savings_tracking_start: "2026-01-01" # Month tracking began (for cumulative totals)
+
+  # ── Spending Category Targets (monthly caps) ──────────────────────────────────
+  # Each group defines what we're CUTTING and what the new target ceiling is.
+  # "saved" each month = combined_target_ceiling - actual_spend (when positive).
+  spending_targets:
+    subscriptions:
+      label: "Subscriptions / Streaming"
+      target: 100                      # New monthly ceiling (was ~$150-200+ before cuts)
+      categories:
+        - "Entertainment"
+        - "Subscriptions"
+        - "Streaming"
+        - "Software"
+        - "Media"
+        - "Apps & Games"
+      merchants: []
+    online_shopping:
+      label: "Amazon / Online Shopping"
+      target: 150                      # New monthly ceiling
+      categories:
+        - "Shopping"
+        - "Online Shopping"
+      merchants:
+        - "Amazon"
+        - "Amzn"
+        - "amazon.com"
+    grocery_walmart:
+      label: "Groceries / Walmart"
+      target: 600                      # Monthly ceiling for groceries + Walmart runs
+      categories:
+        - "Groceries"
+        - "Food & Grocery"
+        - "Food & Drink"
+      merchants:
+        - "Walmart"
+        - "Wal-Mart"
+        - "Sam's Club"
+
+  # ── DTI Configuration ────────────────────────────────────────────────────────
+  # Update gross_monthly_income to your actual gross (pre-tax) monthly income.
+  # Current monthly obligations are pulled live from debts.yml + accounts.json.
+  gross_monthly_income: 12000
+
+  # ── Milestones ───────────────────────────────────────────────────────────────
+  milestones:
+    - id: "savings_discipline"
+      label: "Begin $500/mo savings discipline"
+      target_date: "2026-01-01"
+    - id: "debt_payoff_amazon"
+      label: "Pay off Amazon Store Card"
+      target_date: "2026-06-01"
+    - id: "vest_event"
+      label: "December 2026 Vest Event"
+      target_date: "2026-12-01"
+    - id: "list_current_home"
+      label: "List current home for sale"
+      target_date: "2027-06-01"
+    - id: "close_new_home"
+      label: "Close on new home (~$650k)"
+      target_date: "2027-12-01"
