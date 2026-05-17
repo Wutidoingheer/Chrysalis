@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Purchase Readiness — ADBE Equity Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    .container { max-width: 1300px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      padding: 24px 30px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    }
+    header h1 { font-size: 1.9em; margin-bottom: 4px; }
+    header p  { color: #666; font-size: .95em; }
+    .warning-banner {
+      background: #fff3cd; border: 1px solid #ffc107;
+      border-radius: 6px; padding: 8px 14px; margin-top: 10px;
+      font-size: .88em; color: #856404;
+    }
+
+    /* ── Panels ── */
+    .panel {
+      background: white;
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    }
+    .panel h2 {
+      font-size: 1.15em;
+      color: #333;
+      border-bottom: 1px solid #dee2e6;
+      padding-bottom: 10px;
+      margin-bottom: 18px;
+    }
+    .panel h3 { font-size: .95em; color: #555; margin: 16px 0 8px; }
+
+    /* ── Key Metrics Bar ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 14px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .metric-card .label { font-size: .78em; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+    .metric-card .value { font-size: 1.55em; font-weight: 700; margin-top: 2px; }
+    .metric-card.green .value { color: #10b981; }
+    .metric-card.blue  .value { color: #2563eb; }
+    .metric-card.red   .value { color: #ef4444; }
+    .metric-card.amber .value { color: #d97706; }
+
+    /* ── Controls ── */
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .control-group label { display: block; font-size: .85em; color: #555; margin-bottom: 4px; font-weight: 600; }
+    .control-group .hint { font-size: .78em; color: #888; margin-top: 2px; }
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    input[type=range] { flex: 1; accent-color: #2563eb; cursor: pointer; }
+    .slider-val { min-width: 46px; text-align: right; font-weight: 700; font-size: .92em; }
+    .scenario-btns { display: flex; gap: 6px; margin-bottom: 6px; }
+    .scenario-btn {
+      border: 1px solid #dee2e6; background: #f8f9fa; color: #555;
+      padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: .88em;
+      transition: all .15s;
+    }
+    .scenario-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .price-input-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .price-input-row input[type=number] {
+      width: 90px; padding: 4px 8px; border: 1px solid #dee2e6;
+      border-radius: 5px; font-size: .9em; color: #333;
+    }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: .9em; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f8f9fa; font-weight: 600; color: #555; font-size: .82em; text-transform: uppercase; }
+    tr:hover { background: #fafafa; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.pos { color: #10b981; font-weight: 600; }
+    td.neg { color: #ef4444; font-weight: 600; }
+    td.warn { color: #d97706; font-weight: 600; }
+    td.dim { color: #999; }
+    td input[type=number], td input[type=date], td input[type=text] {
+      width: 100%; border: 1px solid #dee2e6; border-radius: 4px;
+      padding: 4px 7px; font-size: .88em; color: #333;
+    }
+    td input:focus { outline: none; border-color: #2563eb; }
+    .cliff-row { background: #eff6ff !important; font-weight: 600; }
+    .purchase-row { background: #f0fdf4 !important; font-style: italic; }
+
+    /* ── Chart ── */
+    .chart-wrap { position: relative; height: 300px; margin-top: 10px; }
+
+    /* ── DTI Gauge ── */
+    .dti-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+    .dti-box {
+      flex: 1; min-width: 200px; border: 1px solid #dee2e6; border-radius: 8px;
+      padding: 14px 16px; text-align: center;
+    }
+    .dti-box .dti-label { font-size: .78em; color: #888; text-transform: uppercase; margin-bottom: 6px; }
+    .dti-box .dti-val { font-size: 2em; font-weight: 800; }
+    .dti-ok   { color: #10b981; }
+    .dti-warn { color: #d97706; }
+    .dti-bad  { color: #ef4444; }
+    .progress-bar-wrap { background: #eee; border-radius: 4px; height: 10px; margin-top: 6px; overflow: hidden; }
+    .progress-bar { height: 100%; border-radius: 4px; transition: width .3s; }
+    .progress-bar.ok   { background: #10b981; }
+    .progress-bar.warn { background: #d97706; }
+    .progress-bar.bad  { background: #ef4444; }
+
+    /* ── Readiness Indicator ── */
+    .readiness-indicator {
+      border-radius: 8px; padding: 16px 20px; margin-top: 12px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    .readiness-indicator.green  { background: #f0fdf4; border: 1px solid #86efac; }
+    .readiness-indicator.yellow { background: #fffbeb; border: 1px solid #fcd34d; }
+    .readiness-indicator.red    { background: #fef2f2; border: 1px solid #fca5a5; }
+    .readiness-indicator .ri-icon { font-size: 2em; }
+    .readiness-indicator .ri-text { font-size: .92em; }
+    .readiness-indicator strong { display: block; font-size: 1.1em; }
+
+    /* ── ESPP Tradeoff ── */
+    .tradeoff-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: start;
+      margin-top: 14px;
+    }
+    .tradeoff-col { border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; }
+    .tradeoff-col h3 { font-size: .9em; margin-bottom: 10px; }
+    .tradeoff-col .t-row { display: flex; justify-content: space-between; font-size: .88em; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+    .tradeoff-col .t-row:last-child { border-bottom: none; font-weight: 700; }
+    .tradeoff-vs { font-size: 1.4em; color: #999; display: flex; align-items: center; }
+    .delta-badge { font-size: .8em; padding: 2px 8px; border-radius: 10px; }
+    .delta-badge.pos { background: #d1fae5; color: #065f46; }
+    .delta-badge.neg { background: #fee2e2; color: #991b1b; }
+
+    /* ── Spending Tracker ── */
+    .spend-row td:first-child { font-weight: 600; }
+    .deferred-flag {
+      background: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;
+      padding: 8px 12px; font-size: .85em; margin-top: 10px; color: #856404;
+      display: none;
+    }
+    .deferred-flag.visible { display: block; }
+
+    button.add-debt {
+      margin-top: 10px; padding: 6px 14px; border: 1px dashed #2563eb;
+      background: none; color: #2563eb; border-radius: 5px; cursor: pointer; font-size: .85em;
+    }
+    button.add-debt:hover { background: #eff6ff; }
+    .del-btn {
+      border: none; background: none; color: #ef4444; cursor: pointer;
+      font-size: 1em; padding: 2px 6px;
+    }
+    .note { font-size: .8em; color: #888; margin-top: 8px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>🏡 Home Purchase Readiness</h1>
+    <p>Target: ~$650k home — late 2027 &nbsp;|&nbsp; ADBE RSU + ESPP + salary + debt paydown &nbsp;|&nbsp; Utah</p>
+    <div class="warning-banner">
+      ⚠️ All equity figures are <strong>net of withholding</strong> by default. Gross shares are shown for reference only.
+      Do not use gross figures for cash-flow planning.
+    </div>
+  </header>
+
+  <!-- Parameters -->
+  <div class="panel">
+    <h2>⚙️ Parameters</h2>
+    <div class="controls-grid">
+
+      <div class="control-group">
+        <label>ADBE Share Price</label>
+        <div class="scenario-btns">
+          <button class="scenario-btn active" onclick="setScenario(247, this)">Low $247</button>
+          <button class="scenario-btn"        onclick="setScenario(325, this)">Mid $325</button>
+          <button class="scenario-btn"        onclick="setScenario(400, this)">High $400</button>
+        </div>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">Custom:</span>
+          <input type="number" id="customPrice" min="50" max="800" value="247"
+                 oninput="S.price=+this.value; updateAll()" style="width:80px">
+          <span style="font-size:.82em;color:#888;">/share</span>
+        </div>
+        <div class="hint">Scenario swings full-grant net by ~$60K (Low→High)</div>
+      </div>
+
+      <div class="control-group">
+        <label>RSU Withholding (sell-to-cover)</label>
+        <div class="slider-row">
+          <input type="range" id="withholding" min="28" max="42" value="35" step="1"
+                 oninput="S.withholding=+this.value/100; updateVal('withholdingVal',this.value+'%'); updateAll()">
+          <span class="slider-val" id="withholdingVal">35%</span>
+        </div>
+        <div class="hint">Net = shares × price × (1 − withholding). Range 28–42%.</div>
+      </div>
+
+      <div class="control-group">
+        <label>ESPP Contribution Rate</label>
+        <div class="slider-row">
+          <input type="range" id="esppRate" min="0" max="15" value="15" step="1"
+                 oninput="S.esppRate=+this.value/100; updateVal('esppRateVal',this.value+'%'); updateAll()">
+          <span class="slider-val" id="esppRateVal">15%</span>
+        </div>
+        <div class="hint">$150k base × rate ÷ 12 = monthly cash drain. 0% temporarily frees cash.</div>
+      </div>
+
+      <div class="control-group">
+        <label>Effective All-In Tax Rate</label>
+        <div class="slider-row">
+          <input type="range" id="taxRate" min="20" max="40" value="28" step="1"
+                 oninput="S.taxRate=+this.value/100; updateVal('taxRateVal',this.value+'%'); updateAll()">
+          <span class="slider-val" id="taxRateVal">28%</span>
+        </div>
+        <div class="hint">Utah: ~4.85% state + federal + FICA. Effective ~27–30% all-in at $150k.</div>
+      </div>
+
+      <div class="control-group">
+        <label>Annual Bonus Rate</label>
+        <div class="slider-row">
+          <input type="range" id="bonusRate" min="0" max="15" value="7.5" step="0.5"
+                 oninput="S.bonusRate=+this.value/100; updateVal('bonusRateVal',this.value+'%'); updateAll()">
+          <span class="slider-val" id="bonusRateVal">7.5%</span>
+        </div>
+        <div class="hint">Annual bonus net of ~35% withholding. Lands as lump-sum payment.</div>
+      </div>
+
+      <div class="control-group">
+        <label>Target Purchase Date</label>
+        <select id="purchaseDate" onchange="S.purchaseDate=this.value; updateAll()"
+                style="padding:5px 9px; border:1px solid #dee2e6; border-radius:5px; font-size:.9em; color:#333">
+          <option value="2027-09-15">Sep 2027 (before Q4 vest)</option>
+          <option value="2027-12-15" selected>Dec 2027 (after Q4 vest)</option>
+          <option value="2028-03-15">Mar 2028 (after Q1 vest)</option>
+        </select>
+        <div class="hint">Determines which RSU vests are available for down payment.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div class="metrics-grid" id="metricsBar">
+    <div class="metric-card green"><div class="label">Net — Dec 2026 Cliff</div><div class="value" id="m_cliff">—</div></div>
+    <div class="metric-card blue"> <div class="label">Net RSU by Purchase Date</div><div class="value" id="m_purchase">—</div></div>
+    <div class="metric-card blue"> <div class="label">Net RSU — Full Grant</div><div class="value" id="m_full">—</div></div>
+    <div class="metric-card amber"><div class="label">Monthly Take-Home (est.)</div><div class="value" id="m_takehome">—</div></div>
+    <div class="metric-card amber"><div class="label">Monthly Free Cash (w/ ESPP)</div><div class="value" id="m_freecash">—</div></div>
+    <div class="metric-card green"><div class="label">Est. Annual Bonus (net)</div><div class="value" id="m_bonus">—</div></div>
+  </div>
+
+  <!-- RSU Timeline -->
+  <div class="panel">
+    <h2>📅 RSU Vest Schedule — ADBE (617 shares total)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Type</th>
+          <th class="num">Gross Shares</th>
+          <th class="num">Net Shares (est.)</th>
+          <th class="num">Net Cash</th>
+          <th class="num">Cumulative Net</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody id="rsuTableBody"></tbody>
+    </table>
+    <p class="note">155 cliff + 12 × 38.5 quarterly = 617 total. Net shares = gross × (1 − withholding). Net cash = net shares × price.</p>
+  </div>
+
+  <!-- Cumulative Chart -->
+  <div class="panel">
+    <h2>📈 Cumulative Net RSU Cash — Three Price Scenarios</h2>
+    <div class="chart-wrap">
+      <canvas id="rsuChart"></canvas>
+    </div>
+    <p class="note">Shaded reference line at Dec 2027 purchase target. All values net of withholding. Gross shown only for share-count reconciliation.</p>
+  </div>
+
+  <!-- Down Payment Readiness -->
+  <div class="panel">
+    <h2>🏦 Down Payment &amp; Cash Readiness at Purchase Date</h2>
+    <div class="controls-grid" style="margin-bottom:14px">
+      <div class="control-group">
+        <label>Net proceeds from current home sale</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="netProceeds" value="120000" step="1000" min="0"
+                 oninput="S.netProceeds=+this.value; updateAll()">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Closing costs estimate</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="closingCosts" value="19500" step="500" min="0"
+                 oninput="S.closingCosts=+this.value; updateAll()">
+        </div>
+        <div class="hint">~3% of $650k = $19,500</div>
+      </div>
+      <div class="control-group">
+        <label>Reserve buffer target (post-close)</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="reserveTarget" value="20000" step="1000" min="0"
+                 oninput="S.reserveTarget=+this.value; updateAll()">
+        </div>
+        <div class="hint">Cash remaining after down payment + closing</div>
+      </div>
+      <div class="control-group">
+        <label>Additional savings by purchase date</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="additionalSavings" value="6000" step="500" min="0"
+                 oninput="S.additionalSavings=+this.value; updateAll()">
+        </div>
+        <div class="hint">Monthly $500 savings discipline × remaining months</div>
+      </div>
+    </div>
+    <div id="readinessIndicator"></div>
+  </div>
+
+  <!-- Debt & DTI -->
+  <div class="panel">
+    <h2>💳 Debt &amp; DTI Readiness</h2>
+    <p style="font-size:.85em;color:#666;margin-bottom:12px">
+      Enter current balances below. APR and payment are pre-filled where known — update to actuals.
+      Two USAA auto loans are tracked separately.
+    </p>
+    <table id="debtTable">
+      <thead>
+        <tr>
+          <th>Name</th><th>Type</th>
+          <th class="num">Balance ($)</th>
+          <th class="num">APR (%)</th>
+          <th class="num">Monthly Pmt ($)</th>
+          <th class="num">Payoff (mo)</th>
+          <th>Deferred?</th>
+          <th>Promo End</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="debtTableBody"></tbody>
+    </table>
+    <button class="add-debt" onclick="addDebt()">+ Add debt</button>
+    <div class="deferred-flag" id="deferredFlag">
+      ⚠️ <strong>Deferred-Interest Risk:</strong> <span id="deferredFlagText"></span>
+    </div>
+
+    <h3>DTI at Current State</h3>
+    <div class="controls-grid" style="margin-top:10px;">
+      <div class="control-group">
+        <label>Gross monthly income</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="grossMonthly" value="12500" step="100"
+                 oninput="S.grossMonthly=+this.value; updateAll()">
+        </div>
+        <div class="hint">$150k base ÷ 12 = $12,500</div>
+      </div>
+      <div class="control-group">
+        <label>New mortgage PITI estimate (low)</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="pitiLow" value="4200" step="50"
+                 oninput="S.pitiLow=+this.value; updateAll()">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>New mortgage PITI estimate (high)</label>
+        <div class="price-input-row">
+          <span style="font-size:.85em;color:#666;">$</span>
+          <input type="number" id="pitiHigh" value="4600" step="50"
+                 oninput="S.pitiHigh=+this.value; updateAll()">
+        </div>
+      </div>
+    </div>
+    <div class="dti-row" id="dtiRow"></div>
+    <p class="note">Current DTI includes existing mortgage ($1,850/mo P&I). Projected replaces it with new PITI. Lender thresholds: &lt;36% ideal, &lt;43% conventional max.</p>
+  </div>
+
+  <!-- Spending Tracker -->
+  <div class="panel">
+    <h2>✂️ Spending Cut Tracker — $500/mo Goal</h2>
+    <p style="font-size:.85em;color:#666;margin-bottom:12px">
+      Enter this month's actual spending per category. Target is the new monthly ceiling after cuts.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Category</th><th class="num">Monthly Target</th><th class="num">This Month Actual</th><th class="num">Over / Under</th><th class="num">Cumul. Saved (mo)</th></tr>
+      </thead>
+      <tbody>
+        <tr class="spend-row">
+          <td>Subscriptions / Streaming</td>
+          <td class="num">$100</td>
+          <td class="num"><input type="number" id="sp_subs" value="0" min="0" oninput="updateSpending()" style="width:80px;text-align:right"></td>
+          <td class="num" id="sp_subs_diff">—</td>
+          <td class="num" id="sp_subs_cum">—</td>
+        </tr>
+        <tr class="spend-row">
+          <td>Amazon / Online Shopping</td>
+          <td class="num">$150</td>
+          <td class="num"><input type="number" id="sp_amazon" value="0" min="0" oninput="updateSpending()" style="width:80px;text-align:right"></td>
+          <td class="num" id="sp_amazon_diff">—</td>
+          <td class="num" id="sp_amazon_cum">—</td>
+        </tr>
+        <tr class="spend-row">
+          <td>Groceries / Walmart</td>
+          <td class="num">$600</td>
+          <td class="num"><input type="number" id="sp_grocery" value="0" min="0" oninput="updateSpending()" style="width:80px;text-align:right"></td>
+          <td class="num" id="sp_grocery_diff">—</td>
+          <td class="num" id="sp_grocery_cum">—</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700; background:#f8f9fa">
+          <td>Total</td>
+          <td class="num">$850</td>
+          <td class="num" id="sp_total_actual">—</td>
+          <td class="num" id="sp_total_diff">—</td>
+          <td class="num" id="sp_total_cum">—</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div id="spendingSummary" style="margin-top:12px;font-size:.88em;color:#555;"></div>
+    <p class="note">Enter actuals from your Monarch Money export or check_home_readiness.py console output for 3-month averages.</p>
+  </div>
+
+  <!-- ESPP Tradeoff -->
+  <div class="panel">
+    <h2>📊 ESPP Rate Tradeoff</h2>
+    <p style="font-size:.85em;color:#666;margin-bottom:10px">
+      Lowering ESPP frees monthly cash but reduces the ~$2,000/purchase gain and long-term ESPP windfall.
+      Use the slider to compare scenarios side-by-side.
+    </p>
+    <div class="control-group" style="max-width:400px;margin-bottom:16px">
+      <label>Alternative ESPP Rate (for comparison)</label>
+      <div class="slider-row">
+        <input type="range" id="esppAlt" min="0" max="15" value="5" step="1"
+               oninput="updateVal('esppAltVal',this.value+'%'); updateESPPTradeoff()">
+        <span class="slider-val" id="esppAltVal">5%</span>
+      </div>
+    </div>
+    <div class="tradeoff-grid" id="tradeoffGrid"></div>
+  </div>
+
+</div>
+<!-- ═══════════════════════════════════════════════════════ JS ═══════════════ -->
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const BASE_SALARY = 150_000;
+const CURRENT_MORTGAGE = 1_850;  // existing P&I
+const ESPP_DISCOUNT = 0.15;      // 15% look-back discount
+const BONUS_WITHHOLDING = 0.35;
+
+const RSU_SCHEDULE = [
+  { date: '2026-12-15', gross: 155,  type: 'Cliff Vest' },
+  { date: '2027-03-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2027-06-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2027-09-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2027-12-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2028-03-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2028-06-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2028-09-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2028-12-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2029-03-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2029-06-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2029-09-15', gross: 38.5, type: 'Quarterly'  },
+  { date: '2029-12-15', gross: 38.5, type: 'Quarterly'  },
+];
+// Verify: 155 + 12 * 38.5 = 617 — checked at runtime below
+
+const SCENARIOS = { low: 247, mid: 325, high: 400 };
+const PRICE_COLORS = {
+  low:  { border: '#ef4444', bg: 'rgba(239,68,68,.08)'   },
+  mid:  { border: '#d97706', bg: 'rgba(217,119,6,.08)'   },
+  high: { border: '#10b981', bg: 'rgba(16,185,129,.08)'  },
+};
+
+// ── Mutable state ──────────────────────────────────────────────────────────
+let S = {
+  price:            247,
+  withholding:      0.35,
+  esppRate:         0.15,
+  taxRate:          0.28,
+  bonusRate:        0.075,
+  purchaseDate:     '2027-12-15',
+  netProceeds:      120_000,
+  closingCosts:     19_500,
+  reserveTarget:    20_000,
+  additionalSavings:  6_000,
+  grossMonthly:     12_500,
+  pitiLow:          4_200,
+  pitiHigh:         4_600,
+};
+
+let debts = [
+  { id:1, name:'Delta SkyMiles Amex', balance:0,    apr:29.99, payment:650,  type:'cc',          deferred:false, promoEnd:'' },
+  { id:2, name:'Costco Citi',         balance:0,    apr:29.99, payment:400,  type:'cc',          deferred:false, promoEnd:'' },
+  { id:3, name:'Amazon Store Card',   balance:0,    apr:34.3,  payment:112,  type:'cc',          deferred:false, promoEnd:'' },
+  { id:4, name:'USAA Auto Loan 1',    balance:0,    apr:0,     payment:0,    type:'auto',        deferred:false, promoEnd:'' },
+  { id:5, name:'USAA Auto Loan 2',    balance:0,    apr:0,     payment:0,    type:'auto',        deferred:false, promoEnd:'' },
+  { id:6, name:'Deferred-Interest Plan', balance:0, apr:0,     payment:0,    type:'installment', deferred:true,  promoEnd:'2026-12-31' },
+];
+let nextDebtId = 7;
+
+let rsuChart = null;
+let spendingMonths = 1; // months of tracking for cumulative
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = n => '$' + Math.round(n).toLocaleString();
+const fmtK = n => '$' + (n/1000).toFixed(1) + 'K';
+const fmtPct = n => (n*100).toFixed(1) + '%';
+function updateVal(id, val) { $(id).textContent = val; }
+
+// ── RSU Calculations ──────────────────────────────────────────────────────
+function calcRSU(price, withholding) {
+  let cumulative = 0;
+  return RSU_SCHEDULE.map(v => {
+    const netShares = v.gross * (1 - withholding);
+    const netCash   = netShares * price;
+    cumulative += netCash;
+    return { ...v, netShares, netCash, cumulative };
+  });
+}
+
+function rsuNetByDate(vests, cutoffDate) {
+  let total = 0;
+  for (const v of vests) {
+    if (v.date <= cutoffDate) total += v.netCash;
+  }
+  return total;
+}
+
+// ── Income / ESPP ─────────────────────────────────────────────────────────
+function monthlyTakeHome(taxRate) {
+  return (BASE_SALARY / 12) * (1 - taxRate);
+}
+
+function esppMonthlyDrain(esppRate) {
+  // ESPP is an after-tax payroll deduction
+  return (BASE_SALARY * esppRate) / 12;
+}
+
+function esppGainPerPurchase(esppRate) {
+  const contribution = (BASE_SALARY * esppRate) / 2; // semi-annual
+  return contribution * (ESPP_DISCOUNT / (1 - ESPP_DISCOUNT));
+}
+
+function monthlyFreeCash(taxRate, esppRate) {
+  return monthlyTakeHome(taxRate) - esppMonthlyDrain(esppRate);
+}
+
+function netAnnualBonus(bonusRate) {
+  return BASE_SALARY * bonusRate * (1 - BONUS_WITHHOLDING);
+}
+
+// ── Debt / DTI ────────────────────────────────────────────────────────────
+function payoffMonths(balance, apr, payment) {
+  if (balance <= 0) return 0;
+  if (payment <= 0) return Infinity;
+  const r = apr / 100 / 12;
+  if (r === 0) return Math.ceil(balance / payment);
+  if (payment <= balance * r) return Infinity; // can't cover interest
+  return Math.ceil(-Math.log(1 - (balance * r) / payment) / Math.log(1 + r));
+}
+
+function totalMonthlyDebt() {
+  return debts.reduce((sum, d) => sum + (d.balance > 0 ? +d.payment || 0 : 0), 0);
+}
+
+function currentDTI(grossMonthly) {
+  const totalDebt = totalMonthlyDebt() + CURRENT_MORTGAGE;
+  return totalDebt / grossMonthly;
+}
+
+function projectedDTI(grossMonthly, piti) {
+  // Replace current mortgage with new PITI; keep CC + auto payments
+  const ccAuto = debts
+    .filter(d => d.type !== 'installment')
+    .reduce((sum, d) => sum + (d.balance > 0 ? +d.payment || 0 : 0), 0);
+  return (ccAuto + piti) / grossMonthly;
+}
+
+// ── Deferred-Interest Risk Flag ────────────────────────────────────────────
+function checkDeferredRisk() {
+  const flag = $('deferredFlag');
+  const deferredDebts = debts.filter(d => d.deferred && d.balance > 0);
+  if (deferredDebts.length === 0) { flag.classList.remove('visible'); return; }
+
+  const msgs = [];
+  const cliffDate = '2026-12-15';
+  for (const d of deferredDebts) {
+    if (!d.promoEnd) continue;
+    const promoEnds = d.promoEnd;
+    const monthsToPromo = Math.round((new Date(promoEnds) - new Date()) / (1000*60*60*24*30));
+    const monthsToPayoff = payoffMonths(d.balance, d.apr || 26.99, d.payment);
+    const riskIfBeforeCliff = promoEnds < cliffDate;
+    if (riskIfBeforeCliff) {
+      msgs.push(`"${d.name}" promo ends ${promoEnds} — BEFORE Dec 2026 cliff vest. Balance must be paid without vest proceeds.`);
+    } else if (monthsToPayoff > monthsToPromo) {
+      msgs.push(`"${d.name}" payoff ~${monthsToPayoff} months at current payment, promo ends in ~${monthsToPromo} months.`);
+    }
+  }
+  if (msgs.length) {
+    $('deferredFlagText').textContent = msgs.join(' ');
+    flag.classList.add('visible');
+  } else {
+    flag.classList.remove('visible');
+  }
+}
+
+// ── Render RSU Table ──────────────────────────────────────────────────────
+function renderRSUTable(vests) {
+  const tbody = $('rsuTableBody');
+  const purchaseDateStr = S.purchaseDate;
+  tbody.innerHTML = '';
+
+  // Inject a pseudo-row for purchase date if it falls between vests
+  const rows = [...vests];
+
+  rows.forEach(v => {
+    const tr = document.createElement('tr');
+    const isPurchase = v.date === purchaseDateStr;
+    const isCliff    = v.type === 'Cliff Vest';
+    if (isCliff)    tr.className = 'cliff-row';
+    if (isPurchase) tr.className = 'purchase-row';
+
+    const isFuture  = v.date > new Date().toISOString().slice(0,10);
+    const dateFmt   = new Date(v.date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+
+    tr.innerHTML = `
+      <td>${dateFmt}</td>
+      <td>${v.type}${isPurchase ? ' 🎯' : ''}${isCliff ? ' ⭐' : ''}</td>
+      <td class="num dim">${v.gross}</td>
+      <td class="num dim">${v.netShares.toFixed(1)}</td>
+      <td class="num pos">${fmt(v.netCash)}</td>
+      <td class="num" style="font-weight:${isCliff || isPurchase ? '700':'400'}">${fmt(v.cumulative)}</td>
+      <td style="font-size:.82em;color:#666">${
+        isCliff ? 'Key inflection — triggers installment plan payoff window' :
+        isPurchase ? `Cumulative net available at purchase` :
+        isFuture ? '' : 'Past vest'
+      }</td>`;
+    tbody.appendChild(tr);
+
+    // Insert "purchase" marker row if purchase date falls between vests and isn't on a vest date
+    if (isPurchase === false) {
+      const nextIdx = rows.indexOf(v) + 1;
+      const nextDate = rows[nextIdx] ? rows[nextIdx].date : null;
+      if (nextDate && v.date < purchaseDateStr && purchaseDateStr < nextDate) {
+        const markerNet = rsuNetByDate(vests, purchaseDateStr);
+        const markerTr = document.createElement('tr');
+        markerTr.className = 'purchase-row';
+        markerTr.innerHTML = `
+          <td>${new Date(purchaseDateStr + 'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+          <td>🎯 Purchase Target</td>
+          <td class="num dim">—</td><td class="num dim">—</td><td class="num dim">—</td>
+          <td class="num" style="font-weight:700">${fmt(markerNet)}</td>
+          <td style="font-size:.82em;color:#10b981">Cumulative net available</td>`;
+        tbody.appendChild(markerTr);
+      }
+    }
+  });
+}
+
+// ── Render Chart ───────────────────────────────────────────────────────────
+function renderChart() {
+  const labels  = RSU_SCHEDULE.map(v => v.date.slice(0,7));
+  const datasets = Object.entries(SCENARIOS).map(([key, price]) => {
+    const vests = calcRSU(price, S.withholding);
+    let cum = 0;
+    const data = vests.map(v => { cum += v.netCash; return Math.round(cum); });
+    return {
+      label: `${key.charAt(0).toUpperCase() + key.slice(1)} ($${price})`,
+      data,
+      borderColor: PRICE_COLORS[key].border,
+      backgroundColor: PRICE_COLORS[key].bg,
+      fill: true,
+      tension: 0.3,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+    };
+  });
+
+  const ctx = $('rsuChart').getContext('2d');
+  if (rsuChart) { rsuChart.destroy(); }
+
+  // Vertical line plugin for purchase date
+  const purchaseDateStr = S.purchaseDate.slice(0,7);
+  const purchaseIdx = labels.indexOf(purchaseDateStr);
+
+  const vertLinePlugin = {
+    id: 'vertLine',
+    afterDraw(chart) {
+      if (purchaseIdx < 0) return;
+      const { ctx: c, chartArea, scales } = chart;
+      const x = scales.x.getPixelForValue(purchaseIdx);
+      c.save();
+      c.strokeStyle = '#2563eb';
+      c.lineWidth = 1.5;
+      c.setLineDash([4,3]);
+      c.beginPath();
+      c.moveTo(x, chartArea.top);
+      c.lineTo(x, chartArea.bottom);
+      c.stroke();
+      c.fillStyle = '#2563eb';
+      c.font = '11px system-ui';
+      c.fillText('Purchase →', x + 4, chartArea.top + 14);
+      c.restore();
+    }
+  };
+
+  rsuChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'K' }
+        }
+      }
+    },
+    plugins: [vertLinePlugin]
+  });
+}
+
+// ── Render Debt Table ─────────────────────────────────────────────────────
+function renderDebtTable() {
+  const tbody = $('debtTableBody');
+  tbody.innerHTML = '';
+  debts.forEach(d => {
+    const mo = payoffMonths(d.balance, d.apr, d.payment);
+    const moStr = d.balance <= 0 ? '—' : mo === Infinity ? '∞' : mo + ' mo';
+    const moClass = mo > 36 ? 'neg' : mo > 12 ? 'warn' : 'pos';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" value="${d.name}" onchange="debts.find(x=>x.id===${d.id}).name=this.value; updateAll()"></td>
+      <td style="font-size:.8em;color:#888">${d.type}</td>
+      <td class="num"><input type="number" value="${d.balance}" min="0" style="width:90px;text-align:right"
+          onchange="debts.find(x=>x.id===${d.id}).balance=+this.value; updateAll()"></td>
+      <td class="num"><input type="number" value="${d.apr}" min="0" max="50" step="0.01" style="width:60px;text-align:right"
+          onchange="debts.find(x=>x.id===${d.id}).apr=+this.value; updateAll()"></td>
+      <td class="num"><input type="number" value="${d.payment}" min="0" style="width:80px;text-align:right"
+          onchange="debts.find(x=>x.id===${d.id}).payment=+this.value; updateAll()"></td>
+      <td class="num ${d.balance > 0 ? moClass : 'dim'}">${moStr}</td>
+      <td style="text-align:center">
+        <input type="checkbox" ${d.deferred ? 'checked' : ''}
+          onchange="debts.find(x=>x.id===${d.id}).deferred=this.checked; updateAll()">
+      </td>
+      <td><input type="date" value="${d.promoEnd}" style="width:130px"
+          onchange="debts.find(x=>x.id===${d.id}).promoEnd=this.value; updateAll()"></td>
+      <td><button class="del-btn" onclick="removeDebt(${d.id})">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function addDebt() {
+  debts.push({ id: nextDebtId++, name: 'New Debt', balance: 0, apr: 0, payment: 0, type: 'cc', deferred: false, promoEnd: '' });
+  updateAll();
+}
+function removeDebt(id) {
+  debts = debts.filter(d => d.id !== id);
+  updateAll();
+}
+
+// ── Render DTI ────────────────────────────────────────────────────────────
+function renderDTI() {
+  const curDTI  = currentDTI(S.grossMonthly);
+  const projLow = projectedDTI(S.grossMonthly, S.pitiLow);
+  const projHi  = projectedDTI(S.grossMonthly, S.pitiHigh);
+
+  function dtiBox(label, dti) {
+    const pct = dti * 100;
+    const cls = pct < 36 ? 'dti-ok' : pct < 43 ? 'dti-warn' : 'dti-bad';
+    const barCls = pct < 36 ? 'ok' : pct < 43 ? 'warn' : 'bad';
+    return `<div class="dti-box">
+      <div class="dti-label">${label}</div>
+      <div class="dti-val ${cls}">${pct.toFixed(1)}%</div>
+      <div class="progress-bar-wrap"><div class="progress-bar ${barCls}" style="width:${Math.min(pct/50*100,100)}%"></div></div>
+      <div style="font-size:.75em;color:#999;margin-top:4px">${pct < 36 ? 'Ideal' : pct < 43 ? 'Caution' : 'HIGH'}</div>
+    </div>`;
+  }
+
+  $('dtiRow').innerHTML =
+    dtiBox('Current DTI', curDTI) +
+    dtiBox('Projected (PITI Low)', projLow) +
+    dtiBox('Projected (PITI High)', projHi);
+}
+
+// ── Render Readiness ──────────────────────────────────────────────────────
+function renderReadiness(vests) {
+  const netRSU   = rsuNetByDate(vests, S.purchaseDate);
+  const esppGain = esppGainPerPurchase(S.esppRate) * 2; // two purchases per year × years
+  const total    = S.netProceeds + netRSU + S.additionalSavings;
+  const needed   = S.closingCosts + S.reserveTarget;
+  const surplus  = total - needed;
+
+  const el = $('readinessIndicator');
+  const cls = surplus >= 15_000 ? 'green' : surplus >= 0 ? 'yellow' : 'red';
+  const icon = surplus >= 15_000 ? '✅' : surplus >= 0 ? '⚠️' : '🔴';
+
+  el.className = `readiness-indicator ${cls}`;
+  el.innerHTML = `
+    <div class="ri-icon">${icon}</div>
+    <div class="ri-text">
+      <strong>${surplus >= 15_000 ? 'On Track' : surplus >= 0 ? 'Marginal — watch debt paydown' : 'Shortfall — accelerate savings or delay'}</strong>
+      <table style="margin-top:6px;font-size:.85em;border:none">
+        <tr><td>Net home sale proceeds</td><td style="padding-left:12px;font-weight:600">${fmt(S.netProceeds)}</td></tr>
+        <tr><td>Cumulative net RSU by ${S.purchaseDate.slice(0,7)}</td><td style="padding-left:12px;font-weight:600;color:#2563eb">${fmt(netRSU)}</td></tr>
+        <tr><td>Additional savings discipline</td><td style="padding-left:12px;font-weight:600">${fmt(S.additionalSavings)}</td></tr>
+        <tr style="border-top:1px solid #ccc"><td><strong>Total available</strong></td><td style="padding-left:12px;font-weight:700">${fmt(total)}</td></tr>
+        <tr><td>Closing costs</td><td style="padding-left:12px">(${fmt(S.closingCosts)})</td></tr>
+        <tr><td>Reserve target</td><td style="padding-left:12px">(${fmt(S.reserveTarget)})</td></tr>
+        <tr style="border-top:1px solid #ccc"><td><strong>Surplus / (Shortfall)</strong></td>
+            <td style="padding-left:12px;font-weight:700;color:${surplus>=0?'#10b981':'#ef4444'}">${fmt(surplus)}</td></tr>
+      </table>
+    </div>`;
+}
+
+// ── Spending Tracker ──────────────────────────────────────────────────────
+function updateSpending() {
+  const targets = { sp_subs: 100, sp_amazon: 150, sp_grocery: 600 };
+  let totalActual = 0, totalDiff = 0;
+  Object.entries(targets).forEach(([id, target]) => {
+    const actual = +$(id).value || 0;
+    const diff   = actual - target;
+    totalActual += actual;
+    totalDiff   += diff;
+    const diffEl = $(id + '_diff');
+    diffEl.textContent = (diff > 0 ? '+' : '') + '$' + Math.abs(diff).toLocaleString();
+    diffEl.className   = 'num ' + (diff > 0 ? 'neg' : 'pos');
+    // Cumulative (simple: this month × tracking months)
+    const cumSaved = Math.max(0, -diff) * spendingMonths;
+    $(id + '_cum').textContent = fmt(cumSaved);
+  });
+  $('sp_total_actual').textContent = fmt(totalActual);
+  const totalDiffEl = $('sp_total_diff');
+  totalDiffEl.textContent = (totalDiff > 0 ? '+' : '') + '$' + Math.abs(totalDiff).toLocaleString();
+  totalDiffEl.className   = 'num ' + (totalDiff > 0 ? 'neg' : 'pos');
+  const totalSaved = Math.max(0, -totalDiff) * spendingMonths;
+  $('sp_total_cum').textContent = fmt(totalSaved);
+
+  const saved = Math.max(0, -totalDiff);
+  const goal  = 500;
+  const pct   = Math.min(100, saved / goal * 100).toFixed(0);
+  $('spendingSummary').innerHTML = `
+    This month: saved <strong>${fmt(saved)}</strong> vs $500 goal
+    — <strong>${pct}%</strong> of target.
+    ${saved >= goal ? '✅ On track!' : `⚠️ ${fmt(goal - saved)} more to cut.`}`;
+}
+
+// ── ESPP Tradeoff ─────────────────────────────────────────────────────────
+function updateESPPTradeoff() {
+  const rateA = S.esppRate;
+  const rateB = +$('esppAlt').value / 100;
+
+  function scenario(rate) {
+    const drain     = esppMonthlyDrain(rate);
+    const takehome  = monthlyTakeHome(S.taxRate);
+    const free      = takehome - drain;
+    const gainPerYr = esppGainPerPurchase(rate) * 2;
+    // Rough debt payoff: total CC debt at current payment + extra free cash
+    const extraFree = Math.max(0, free - 2_000); // assume $2k fixed expenses + margin
+    const totalDebt = debts.filter(d => d.type === 'cc').reduce((s,d) => s + (d.balance||0), 0);
+    const totalPmt  = debts.filter(d => d.type === 'cc').reduce((s,d) => s + (d.balance > 0 ? +d.payment||0 : 0), 0);
+    const payoffMo  = totalDebt > 0 && totalPmt > 0 ? payoffMonths(totalDebt, 20, totalPmt) : 0;
+    return { drain, takehome, free, gainPerYr, payoffMo };
+  }
+
+  const A = scenario(rateA);
+  const B = scenario(rateB);
+  const freeDelta = B.free - A.free;
+  const gainDelta = B.gainPerYr - A.gainPerYr;
+
+  function col(label, sc, rate, isAlt) {
+    return `<div class="tradeoff-col" style="${isAlt ? 'border-color:#2563eb' : ''}">
+      <h3>${label} (ESPP ${(rate*100).toFixed(0)}%)</h3>
+      <div class="t-row"><span>Monthly ESPP drain</span><span style="color:#ef4444">(${fmt(sc.drain)})</span></div>
+      <div class="t-row"><span>Monthly take-home</span><span>${fmt(sc.takehome)}</span></div>
+      <div class="t-row"><span>Monthly free cash</span><span style="font-weight:700">${fmt(sc.free)}</span></div>
+      <div class="t-row"><span>ESPP gain/yr (est.)</span><span style="color:#10b981">${fmt(sc.gainPerYr)}</span></div>
+      <div class="t-row"><span>CC debt payoff</span><span>${sc.payoffMo === 0 ? '—' : sc.payoffMo === Infinity ? '∞' : sc.payoffMo + ' mo'}</span></div>
+    </div>`;
+  }
+
+  const vs = `<div class="tradeoff-vs">
+    vs
+    <div style="font-size:.65em;text-align:center;margin-top:6px">
+      <div class="delta-badge ${freeDelta >= 0 ? 'pos' : 'neg'}" style="margin-bottom:4px">
+        Free cash: ${freeDelta >= 0 ? '+' : ''}${fmt(freeDelta)}/mo
+      </div>
+      <div class="delta-badge ${gainDelta >= 0 ? 'pos' : 'neg'}">
+        ESPP gain: ${gainDelta >= 0 ? '+' : ''}${fmt(gainDelta)}/yr
+      </div>
+    </div>
+  </div>`;
+
+  $('tradeoffGrid').innerHTML =
+    col('Current', A, rateA, false) + vs + col('Alternative', B, rateB, true);
+}
+
+// ── Key Metrics Bar ───────────────────────────────────────────────────────
+function updateMetrics(vests) {
+  const cliff   = vests.find(v => v.type === 'Cliff Vest');
+  const atPurch = rsuNetByDate(vests, S.purchaseDate);
+  const full    = vests[vests.length - 1].cumulative;
+  const takehome = monthlyTakeHome(S.taxRate);
+  const freecash = monthlyFreeCash(S.taxRate, S.esppRate);
+  const bonus    = netAnnualBonus(S.bonusRate);
+
+  $('m_cliff').textContent    = fmt(cliff.netCash);
+  $('m_purchase').textContent = fmt(atPurch);
+  $('m_full').textContent     = fmt(full);
+  $('m_takehome').textContent = fmt(takehome);
+  $('m_freecash').textContent = fmt(freecash);
+  $('m_bonus').textContent    = fmt(bonus);
+}
+
+// ── Scenario button helper ─────────────────────────────────────────────────
+function setScenario(price, btn) {
+  S.price = price;
+  $('customPrice').value = price;
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateAll();
+}
+
+// ── Master update ─────────────────────────────────────────────────────────
+function updateAll() {
+  const vests = calcRSU(S.price, S.withholding);
+  updateMetrics(vests);
+  renderRSUTable(vests);
+  renderChart();
+  renderReadiness(vests);
+  renderDebtTable();
+  renderDTI();
+  checkDeferredRisk();
+  updateSpending();
+  updateESPPTradeoff();
+}
+
+// ── Sanity check ──────────────────────────────────────────────────────────
+(function sanity() {
+  const totalGross = RSU_SCHEDULE.reduce((s, v) => s + v.gross, 0);
+  if (Math.abs(totalGross - 617) > 0.01) {
+    console.error('RSU schedule does not sum to 617:', totalGross);
+  }
+})();
+
+// ── Init ──────────────────────────────────────────────────────────────────
+updateAll();
+</script>
+</body>
+</html>

@@ -1,7 +1,45 @@
 # Home Purchase Readiness — Planning & Accountability Configuration
 # Goal: Sell current home and buy ~$650k home by late 2027
+# State: Utah (4.85% flat income tax)
 
 home_purchase:
+
+  # ── ADBE RSU Grant ────────────────────────────────────────────────────────────
+  # Total: 617 shares (155 cliff + 12 × 38.5 quarterly)
+  # Cliff: 2026-12-15 | Quarterly: Mar/Jun/Sep/Dec 15 starting 2027-03-15
+  # All net figures = shares × price × (1 − withholding). Gross shown for reference only.
+  adbe_total_shares: 617
+  adbe_cliff_shares: 155
+  adbe_quarterly_shares: 38.5    # true average; 12 × 38.5 = 462 = 617 − 155
+  rsu_withholding_default: 0.35  # sell-to-cover, valid range 0.28–0.42
+
+  # ── ADBE Price Scenarios ──────────────────────────────────────────────────────
+  # Swing: Low→High changes full-grant net by ~$60K. Default is near 52-wk low.
+  adbe_price_default: 247
+  adbe_price_low: 247
+  adbe_price_mid: 325
+  adbe_price_high: 400
+
+  # Reference validation at $247 / 35% withholding (net):
+  #   Dec 2026 cliff:           155 × 247 × 0.65 ≈ $24,888
+  #   Cumul. through Sep 2027:  (155 + 3×38.5) × 247 × 0.65 ≈ $43,432
+  #   Cumul. through Dec 2027:  (155 + 4×38.5) × 247 × 0.65 ≈ $49,614
+  #   Full grant (617 shares):  617 × 247 × 0.65 ≈ $99,059
+
+  # ── ESPP ─────────────────────────────────────────────────────────────────────
+  # 15% of $150k base = $22,500/yr = $1,875/mo after-tax deduction
+  # Purchase dates: Jun 30, Dec 31; 15% look-back discount → ~$2,000/purchase gain
+  # Do NOT count ESPP gain as monthly income — it's a twice-yearly event.
+  espp_rate_default: 0.15     # 0–0.15; expose as adjustable in dashboard
+  espp_discount: 0.15         # look-back floor discount rate
+
+  # ── Income (Utah) ──────────────────────────────────────────────────────────
+  base_salary: 150000
+  # Effective all-in rate: fed ~22% + Utah 4.85% + FICA ~1.4% ≈ 28%
+  # Expose as a setting — state is Utah (flat 4.85%), adjust federal bracket as needed.
+  effective_tax_rate: 0.28
+  bonus_rate_default: 0.075   # 0–15% of base; conservative default
+  bonus_withholding: 0.35     # supplemental withholding on bonus lump-sum
 
   # ── Current Home ─────────────────────────────────────────────────────────────
   current_mortgage_payment: 1850.0     # Current P&I monthly payment

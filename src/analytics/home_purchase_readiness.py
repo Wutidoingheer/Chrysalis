@@ -3,17 +3,22 @@ home_purchase_readiness.py
 
 Analytics for the Home Purchase Readiness tracker.
 
-Provides four functions that operate on the same data structures used throughout
-the rest of the app (transactions DataFrame, accounts list, debts.yml config):
+Transaction-based functions (require Monarch data in data/raw/):
+  spending_vs_targets(df, config)       — monthly actual vs. target for 3 cut categories
+  monthly_savings_progress(df, config)  — running $500/mo savings discipline tracking
 
-  spending_vs_targets(df, config)  — monthly actual vs. target for 3 cut categories
-  monthly_savings_progress(df, config) — running $500/mo savings discipline tracking
-  milestone_status(config)         — milestone timeline with countdown + status
-  dti_readiness(accounts, config)  — current & projected DTI indicator
+Config-only functions (no live data required):
+  rsu_schedule(config)       — full vest schedule, net of withholding
+  rsu_net_by_date(vests, dt) — cumulative net cash through a given date
+  espp_summary(config)       — ESPP monthly drain and per-purchase gain
+  income_summary(config)     — take-home, free cash, annual bonus (net)
+  milestone_status(config)   — milestone timeline with countdown + status
+  dti_readiness(accounts, config) — current & projected DTI indicator
 """
 
 from pathlib import Path
 from datetime import date
+from math import log
 import yaml
 import pandas as pd
 
@@ -316,4 +321,154 @@ def dti_readiness(accounts: list, config: dict) -> dict:
         "threshold_max":          43.0,
         "current_ok":             current_dti < 43.0,
         "projected_ok":           proj_dti_high < 43.0,
+    }
+
+
+# ── 5. RSU Schedule ───────────────────────────────────────────────────────────
+
+# Static vest schedule. Quarterly vests use 38.5 (true average) so the running
+# total reconciles exactly to 617 rather than rounding each vest independently.
+_RSU_SCHEDULE_RAW = [
+    ("2026-12-15", 155.0,  "Cliff Vest"),
+    ("2027-03-15",  38.5,  "Quarterly"),
+    ("2027-06-15",  38.5,  "Quarterly"),
+    ("2027-09-15",  38.5,  "Quarterly"),
+    ("2027-12-15",  38.5,  "Quarterly"),
+    ("2028-03-15",  38.5,  "Quarterly"),
+    ("2028-06-15",  38.5,  "Quarterly"),
+    ("2028-09-15",  38.5,  "Quarterly"),
+    ("2028-12-15",  38.5,  "Quarterly"),
+    ("2029-03-15",  38.5,  "Quarterly"),
+    ("2029-06-15",  38.5,  "Quarterly"),
+    ("2029-09-15",  38.5,  "Quarterly"),
+    ("2029-12-15",  38.5,  "Quarterly"),
+]
+# 155 + 12 * 38.5 = 617 — verified in tests/test_home_purchase_readiness.py
+
+
+def rsu_schedule(config: dict) -> list[dict]:
+    """
+    Returns the full vest schedule with net-of-withholding calculations.
+
+    Each entry:
+      date, vest_type, gross_shares, withholding_rate, net_shares, price,
+      net_cash (net_shares × price), cumulative_net_cash
+    """
+    price       = float(config.get("adbe_price_default", 247))
+    withholding = float(config.get("rsu_withholding_default", 0.35))
+
+    cumulative = 0.0
+    results = []
+    for vest_date, gross, vest_type in _RSU_SCHEDULE_RAW:
+        net_shares = gross * (1 - withholding)
+        net_cash   = net_shares * price
+        cumulative += net_cash
+        results.append({
+            "date":               vest_date,
+            "vest_type":          vest_type,
+            "gross_shares":       gross,
+            "withholding_rate":   withholding,
+            "net_shares":         round(net_shares, 2),
+            "price":              price,
+            "net_cash":           round(net_cash, 2),
+            "cumulative_net_cash": round(cumulative, 2),
+        })
+    return results
+
+
+def rsu_net_by_date(vests: list[dict], cutoff: str) -> float:
+    """Cumulative net RSU cash for all vests on or before cutoff (YYYY-MM-DD)."""
+    return round(sum(v["net_cash"] for v in vests if v["date"] <= cutoff), 2)
+
+
+# ── 6. ESPP Summary ───────────────────────────────────────────────────────────
+
+def espp_summary(config: dict) -> dict:
+    """
+    Models ESPP as a continuous monthly cash drain with twice-yearly realized gain.
+
+    Assumptions:
+      - Contribution = espp_rate × base_salary / 12 per month (after-tax deduction)
+      - 15% look-back discount: each $N invested purchases $N / 0.85 worth of stock
+      - Realized gain per purchase = contribution_period × (discount / (1 - discount))
+      - Two purchase dates per year (Jun 30, Dec 31)
+
+    Returns monthly_drain, annual_drain, gain_per_purchase, annual_gain,
+    and sensitivity: gain at 10%, 5%, 0% rates for comparison.
+    """
+    base    = float(config.get("base_salary", 150_000))
+    rate    = float(config.get("espp_rate_default", 0.15))
+    discount = float(config.get("espp_discount", 0.15))  # 15% look-back floor
+
+    monthly_drain     = base * rate / 12
+    annual_drain      = base * rate
+    semi_annual_contribution = annual_drain / 2
+    gain_per_purchase = semi_annual_contribution * (discount / (1 - discount))
+    annual_gain       = gain_per_purchase * 2
+
+    sensitivity = []
+    for r in [0.15, 0.10, 0.05, 0.0]:
+        d = base * r / 12
+        g = (base * r / 2) * (discount / (1 - discount))
+        sensitivity.append({
+            "espp_rate":      r,
+            "monthly_drain":  round(d, 2),
+            "gain_per_purchase": round(g, 2),
+            "annual_gain":    round(g * 2, 2),
+            "annual_net_benefit": round(g * 2 - base * r, 2),
+        })
+
+    return {
+        "espp_rate":          rate,
+        "base_salary":        base,
+        "monthly_drain":      round(monthly_drain, 2),
+        "annual_drain":       round(annual_drain, 2),
+        "gain_per_purchase":  round(gain_per_purchase, 2),
+        "annual_gain":        round(annual_gain, 2),
+        "sensitivity":        sensitivity,
+        "note": (
+            "ESPP drain is an after-tax payroll deduction. "
+            "Gain is realized at each purchase date (Jun 30, Dec 31), "
+            "not spread monthly — do not count as monthly income."
+        ),
+    }
+
+
+# ── 7. Income Summary ─────────────────────────────────────────────────────────
+
+def income_summary(config: dict) -> dict:
+    """
+    Computes take-home and free cash figures.
+
+    Utah all-in effective rate at $150k is approximately 27–29%:
+      Federal income tax: ~22% effective
+      Utah state (flat):   4.85%
+      FICA (employee):    ~1.4% above SS wage base, partial Medicare
+    Default 28% is a reasonable conservative assumption; expose as a setting.
+
+    Bonus withholding defaults to 35% (supplemental rate).
+    """
+    base        = float(config.get("base_salary", 150_000))
+    tax_rate    = float(config.get("effective_tax_rate", 0.28))
+    espp_rate   = float(config.get("espp_rate_default", 0.15))
+    bonus_rate  = float(config.get("bonus_rate_default", 0.075))
+    bonus_wh    = float(config.get("bonus_withholding", 0.35))
+
+    gross_monthly     = base / 12
+    takehome_monthly  = gross_monthly * (1 - tax_rate)
+    espp_drain        = base * espp_rate / 12
+    free_cash_monthly = takehome_monthly - espp_drain
+    gross_bonus       = base * bonus_rate
+    net_bonus         = gross_bonus * (1 - bonus_wh)
+
+    return {
+        "base_salary":        base,
+        "gross_monthly":      round(gross_monthly, 2),
+        "effective_tax_rate": tax_rate,
+        "takehome_monthly":   round(takehome_monthly, 2),
+        "espp_monthly_drain": round(espp_drain, 2),
+        "free_cash_monthly":  round(free_cash_monthly, 2),
+        "gross_annual_bonus": round(gross_bonus, 2),
+        "net_annual_bonus":   round(net_bonus, 2),
+        "utah_note": "Utah flat state tax: 4.85%. Default 28% all-in covers fed + UT + FICA.",
     }
